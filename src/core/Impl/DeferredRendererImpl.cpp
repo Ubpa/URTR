@@ -217,7 +217,6 @@ void DeferredRenderer::Impl::RenderImpl(Scene* scene, SObj* camObj, size_t width
 	auto cam_front = cam_l2w * vecf3{ 0,0,-1 };
 	gProgram->SetMatf4("view", transformf::look_at(cam_pos, cam_pos + cam_front));
 	gProgram->SetMatf4("projection", transformf::perspective(camera->fov, camera->ar, 0.1f, 100.f));
-
 	scene->Each([this](Cmpt::Geometry* geo, Cmpt::Material* mat) {
 		Primitive* primitive = geo->primitive;
 		auto va = GetPrimitiveVAO(primitive);
@@ -248,6 +247,7 @@ void DeferredRenderer::Impl::RenderImpl(Scene* scene, SObj* camObj, size_t width
 
 	deferredlightProgram->SetVecf3("pointlight_pos", { 0,3,0 });
 	deferredlightProgram->SetVecf3("pointlight_radiance", { 100,100,120 });
+	deferredlightProgram->SetVecf3("camera_pos", cam_pos);
 
 	screen->va->Draw(deferredlightProgram);
 }
