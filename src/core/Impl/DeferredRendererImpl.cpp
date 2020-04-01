@@ -227,12 +227,20 @@ void DeferredRenderer::Impl::ResizeBuffer(size_t width, size_t height) {
 void DeferredRenderer::Impl::RenderImpl(Scene* scene, SObj* camObj, size_t width, size_t height) {
 	ResizeBuffer(width, height);
 
-	gb.Bind();
-	gl::Enable(gl::Capability::DepthTest);
-	gl::ClearColor({ 0.f,0.f,0.f,0.f });
-	gl::Clear(gl::BufferSelectBit::ColorBufferBit
-		| gl::BufferSelectBit::DepthBufferBit
-		| gl::BufferSelectBit::StencilBufferBit);
+	// set pointlights
+	size_t pointLightNum = 0;
+	scene->Each([this, &pointLightNum](Cmpt::Light* light) {
+		if (vtable_is<PointLight>(light->light.get())) {
+			auto pointLight = static_cast<const PointLight*>(light->light.get());
+			auto pos = light->sobj->Get<Cmpt::Transform>()->GetWorldPos();
+			string obj = string("pointlights[") + to_string(pointLightNum++) + "]";
+			deferredlightProgram->SetVecf3((obj + ".position").c_str(), pos);
+			deferredlightProgram->SetVecf3((obj + ".radiance").c_str(), pointLight->intensity * pointLight->color);
+		}
+	});
+	deferredlightProgram->SetUInt("pointlight_num", pointLightNum);
+
+	// camera
 	auto camera = camObj->Get<Cmpt::Camera>();
 	assert(camera != nullptr);
 	auto cam_l2w = camObj->Get<Cmpt::Transform>()->GetLocalToWorldMatrix();
@@ -240,6 +248,14 @@ void DeferredRenderer::Impl::RenderImpl(Scene* scene, SObj* camObj, size_t width
 	auto cam_front = cam_l2w * vecf3{ 0,0,-1 };
 	gProgram->SetMatf4("view", transformf::look_at(cam_pos, cam_pos + cam_front));
 	gProgram->SetMatf4("projection", transformf::perspective(camera->fov, camera->ar, 0.1f, 100.f));
+	deferredlightProgram->SetVecf3("camera_pos", cam_pos);
+
+	gb.Bind();
+	gl::Enable(gl::Capability::DepthTest);
+	gl::ClearColor({ 0.f,0.f,0.f,0.f });
+	gl::Clear(gl::BufferSelectBit::ColorBufferBit
+		| gl::BufferSelectBit::DepthBufferBit
+		| gl::BufferSelectBit::StencilBufferBit);
 	scene->Each([this](Cmpt::Geometry* geo, Cmpt::Material* mat) {
 		Primitive* primitive = geo->primitive;
 		auto va = GetPrimitiveVAO(primitive);
@@ -270,7 +286,6 @@ void DeferredRenderer::Impl::RenderImpl(Scene* scene, SObj* camObj, size_t width
 
 	deferredlightProgram->SetVecf3("pointlight_pos", { 0,3,0 });
 	deferredlightProgram->SetVecf3("pointlight_radiance", { 100,100,120 });
-	deferredlightProgram->SetVecf3("camera_pos", cam_pos);
 
 	screen->va->Draw(deferredlightProgram);
 }

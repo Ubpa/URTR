@@ -62,6 +62,7 @@ int main() {
 	auto [sobj1, tsfm1, geo1, mat1] = scene.CreateSObj<Cmpt::Transform, Cmpt::Geometry, Cmpt::Material>("sobj1");
 	auto [sobj2, tsfm2, geo2, mat2] = scene.CreateSObj<Cmpt::Transform, Cmpt::Geometry, Cmpt::Material>("sobj2");
 	auto [sobj3, tsfm3, geo3, mat3] = scene.CreateSObj<Cmpt::Transform, Cmpt::Geometry, Cmpt::Material>("sobj3");
+    auto [sobj4, tsfm4, light4] = scene.CreateSObj<Cmpt::Transform, Cmpt::Light>("sobj4");
 
 	geo1->SetPrimitive(new Sphere);
 	geo2->SetPrimitive(new Square);
@@ -92,6 +93,9 @@ int main() {
 	tsfm3->SetScale({ 1,2,1 });
 	tsfm3->SetRotation({ vecf3{1,2,1}.normalize(), to_radian(45.f) });
 	camera->Init(to_radian(60.f), SCR_WIDTH / static_cast<float>(SCR_HEIGHT));
+
+    light4->light = new PointLight{ 100.f,{0.9f,0.9f,1.f} };
+    tsfm4->SetPosition({ 0,4,0 });
 
 	DeferredRenderer rtr;
 
