@@ -87,6 +87,26 @@ DeferredRenderer::Impl::Impl()
 	quad_format.attrptrs.push_back(screen->n2vb["pos_uv"]->AttrPtr(2, gl::DataType::Float, GL_FALSE, 4 * sizeof(GLfloat), (const void*)(2 * sizeof(float))));
 	quad_format.eb = screen->eb;
 	screen->va = new gl::VertexArray{ { 0,1 }, quad_format };
+
+	auto sphereMesh = TriMesh(TriMesh::Type::Sphere);
+	auto pos = new gl::VertexBuffer(sphereMesh.positions->size() * sizeof(pointf3), sphereMesh.positions->data()->data(), gl::BufferUsage::DynamicDraw);
+	auto uv = new gl::VertexBuffer(sphereMesh.texcoords->size() * sizeof(pointf2), sphereMesh.texcoords->data()->data(), gl::BufferUsage::DynamicDraw);
+	auto normal = new gl::VertexBuffer(sphereMesh.normals->size() * sizeof(normalf), sphereMesh.normals->data()->data(), gl::BufferUsage::DynamicDraw);
+	auto tangent = new gl::VertexBuffer(sphereMesh.tangents->size() * sizeof(vecf3), sphereMesh.tangents->data()->data(), gl::BufferUsage::DynamicDraw);
+	auto indices = new gl::ElementBuffer(gl::BasicPrimitiveType::Triangles, sphereMesh.indices->size(), sphereMesh.indices->data()->data());
+	gl::VertexArray::Format format;
+	format.attrptrs.push_back(pos->AttrPtr(3, gl::DataType::Float, GL_FALSE, sizeof(pointf3)));
+	format.attrptrs.push_back(uv->AttrPtr(2, gl::DataType::Float, GL_FALSE, sizeof(pointf2)));
+	format.attrptrs.push_back(normal->AttrPtr(3, gl::DataType::Float, GL_FALSE, sizeof(normalf)));
+	format.attrptrs.push_back(tangent->AttrPtr(3, gl::DataType::Float, GL_FALSE, sizeof(vecf3)));
+	format.eb = indices;
+	sphere = new PrimitiveResource;
+	sphere->va = new gl::VertexArray{ {0,1,2,3}, format };
+	sphere->eb = indices;
+	sphere->n2vb["pos"] = pos;
+	sphere->n2vb["uv"] = uv;
+	sphere->n2vb["normal"] = normal;
+	sphere->n2vb["tangent"] = tangent;
 }
 
 DeferredRenderer::Impl::~Impl() {
@@ -103,15 +123,16 @@ DeferredRenderer::Impl::~Impl() {
 		delete shader;
 	for (const auto& [primitive, rec] : p2r)
 		delete rec;
+
 	delete screen;
+	delete sphere;
 }
 
 gl::VertexArray* DeferredRenderer::Impl::GetPrimitiveVAO(const Primitive* primitive) {
-	auto target = p2r.find(primitive);
-	if (target != p2r.end())
-		return target->second->va;
-	
 	if (vtable_is<TriMesh>(primitive)) {
+		auto target = p2r.find(primitive);
+		if (target != p2r.end())
+			return target->second->va;
 		auto trimesh = static_cast<const TriMesh*>(primitive);
 		auto pos = new gl::VertexBuffer(trimesh->positions->size() * sizeof(pointf3), trimesh->positions->data()->data(), gl::BufferUsage::DynamicDraw);
 		auto uv = new gl::VertexBuffer(trimesh->texcoords->size() * sizeof(pointf2), trimesh->texcoords->data()->data(), gl::BufferUsage::DynamicDraw);
@@ -134,7 +155,9 @@ gl::VertexArray* DeferredRenderer::Impl::GetPrimitiveVAO(const Primitive* primit
 		p2r[primitive] = rec;
 		return rec->va;
 	}
-	else
+	else if (vtable_is<Sphere>(primitive)) {
+		return sphere->va;
+	}else
 		return nullptr;
 }
 
