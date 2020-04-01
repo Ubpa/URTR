@@ -9,6 +9,7 @@
 
 namespace Ubpa {
 	class Primitive;
+	class Image;
 
 	class DeferredRenderer::Impl {
 	public:
@@ -20,6 +21,11 @@ namespace Ubpa {
 	private:
 		void ResizeBuffer(size_t width, size_t height);
 		gl::VertexArray* GetPrimitiveVAO(const Primitive* primitive);
+		enum class DefaultTex {
+			White,
+			Normal,
+		};
+		gl::Texture2D* GetTex2D(const Image* img, DefaultTex default_tex = DefaultTex::White);
 
 	private:
 		struct PrimitiveResource;
@@ -34,5 +40,7 @@ namespace Ubpa {
 		gl::FrameBuffer gb;
 		std::map<std::string, gl::Shader*> path2shader;
 		PrimitiveResource* screen{ nullptr };
+		gl::Texture2D default_white;
+		gl::Texture2D default_normal;
 	};
 }
