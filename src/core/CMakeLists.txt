@@ -11,8 +11,8 @@ Ubpa_AddTarget_GDR(
 	MODE "LIB"
 	SOURCES ${sources}
 	INTERFACE_INC ON
-	GENERAL_LIBS
-		"Ubpa::UScene_core"
 	PUBLIC_GLIBS
+		"Ubpa::UScene_core"
 		"Ubpa::UGL_core"
+		"Ubpa::UDP_core"
 )
