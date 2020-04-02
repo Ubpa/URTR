@@ -13,6 +13,7 @@ Ubpa_AddTarget_GDR(
 	INTERFACE_INC ON
 	PUBLIC_GLIBS
 		"Ubpa::UScene_core"
+		"Ubpa::UScene_tool"
 		"Ubpa::UGL_core"
 		"Ubpa::UDP_core"
 )

@@ -83,7 +83,7 @@ include_directories(${PROJECT_SOURCE_DIR}/include/_deps/)
 set(UBPA_UGL_GLAD TRUE)
 
 Ubpa_AddDep(UGL 0.1.1)
-Ubpa_AddDep(UScene 0.2.0)
+Ubpa_AddDep(UScene 0.2.1)
 Ubpa_AddDep(UDP 0.3.0)
 
 Ubpa_AddSubDirsRec(src)
