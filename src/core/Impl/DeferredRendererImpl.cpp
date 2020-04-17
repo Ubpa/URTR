@@ -1,24 +1,12 @@
 #include "DeferredRendererImpl.h"
 
-#include <UScene/core/core>
+#include <UScene/core.h>
 
+#include <UBL/RsrcMngr.h>
 #include <UDP/Basic/vtable.h>
 
 using namespace Ubpa;
 using namespace std;
-
-struct DeferredRenderer::Impl::PrimitiveResource {
-	gl::VertexArray* va{ nullptr };
-	std::map<std::string, gl::VertexBuffer*> n2vb;
-	gl::ElementBuffer* eb{ nullptr };
-
-	~PrimitiveResource() {
-		delete va;
-		for (const auto& [name, vb] : n2vb)
-			delete vb;
-		delete eb;
-	}
-};
 
 DeferredRenderer::Impl::Impl()
 	: depth{ new gl::RenderBuffer }
@@ -41,17 +29,11 @@ DeferredRenderer::Impl::Impl()
 	string img_fs_path = "../data/shaders/img.fs";
 	string deferredlight_fs_path = "../data/shaders/deferredlight.fs";
 
-	auto p3t2n3t3_vs = new gl::Shader(gl::ShaderType::VertexShader, p3t2n3t3_vs_path);
-	auto gbuffer_fs = new gl::Shader(gl::ShaderType::FragmentShader, gbuffer_fs_path);
-	auto p2t2_vs = new gl::Shader(gl::ShaderType::VertexShader, p2t2_vs_path);
-	auto img_fs = new gl::Shader(gl::ShaderType::FragmentShader, img_fs_path);
-	auto deferredlight_fs = new gl::Shader(gl::ShaderType::FragmentShader, deferredlight_fs_path);
-
-	path2shader[p3t2n3t3_vs_path] = p3t2n3t3_vs;
-	path2shader[gbuffer_fs_path] = gbuffer_fs;
-	path2shader[p2t2_vs_path] = p2t2_vs;
-	path2shader[img_fs_path] = img_fs;
-	path2shader[deferredlight_fs_path] = deferredlight_fs;
+	auto p3t2n3t3_vs = RsrcMngr<gl::Shader>::Instance().GetOrCreate(p3t2n3t3_vs_path, gl::ShaderType::VertexShader, p3t2n3t3_vs_path);
+	auto gbuffer_fs = RsrcMngr<gl::Shader>::Instance().GetOrCreate(gbuffer_fs_path, gl::ShaderType::FragmentShader, gbuffer_fs_path);
+	auto p2t2_vs = RsrcMngr<gl::Shader>::Instance().GetOrCreate(p2t2_vs_path, gl::ShaderType::VertexShader, p2t2_vs_path);
+	auto img_fs = RsrcMngr<gl::Shader>::Instance().GetOrCreate(img_fs_path, gl::ShaderType::FragmentShader, img_fs_path);
+	auto deferredlight_fs = RsrcMngr<gl::Shader>::Instance().GetOrCreate(deferredlight_fs_path, gl::ShaderType::FragmentShader, deferredlight_fs_path);
 
 	gProgram = new gl::Program(p3t2n3t3_vs, gbuffer_fs);
 	screenProgram = new gl::Program(p2t2_vs, img_fs);
@@ -79,34 +61,14 @@ DeferredRenderer::Impl::Impl()
 	unsigned int quad_indices[] = {
 		2, 3, 1, 0, 1, 3
 	};
-	screen = new PrimitiveResource;
-	screen->eb = new gl::ElementBuffer(gl::BasicPrimitiveType::Triangles, 2, quad_indices);
-	gl::VertexArray::Format quad_format;
-	screen->n2vb["pos_uv"] = new gl::VertexBuffer(sizeof(quad_vertices), quad_vertices, gl::BufferUsage::StaticDraw);
-	quad_format.attrptrs.push_back(screen->n2vb["pos_uv"]->AttrPtr(2, gl::DataType::Float, GL_FALSE, 4 * sizeof(GLfloat), (const void*)(0 * sizeof(float))));
-	quad_format.attrptrs.push_back(screen->n2vb["pos_uv"]->AttrPtr(2, gl::DataType::Float, GL_FALSE, 4 * sizeof(GLfloat), (const void*)(2 * sizeof(float))));
-	quad_format.eb = screen->eb;
-	screen->va = new gl::VertexArray{ { 0,1 }, quad_format };
+	screen = new gl::Mesh(gl::BasicPrimitiveType::Triangles, 2, 4, quad_indices, quad_vertices, { 2,2 });
 
 	auto sphereMesh = TriMesh(TriMesh::Type::Sphere);
-	auto pos = new gl::VertexBuffer(sphereMesh.positions->size() * sizeof(pointf3), sphereMesh.positions->data()->data(), gl::BufferUsage::DynamicDraw);
-	auto uv = new gl::VertexBuffer(sphereMesh.texcoords->size() * sizeof(pointf2), sphereMesh.texcoords->data()->data(), gl::BufferUsage::DynamicDraw);
-	auto normal = new gl::VertexBuffer(sphereMesh.normals->size() * sizeof(normalf), sphereMesh.normals->data()->data(), gl::BufferUsage::DynamicDraw);
-	auto tangent = new gl::VertexBuffer(sphereMesh.tangents->size() * sizeof(vecf3), sphereMesh.tangents->data()->data(), gl::BufferUsage::DynamicDraw);
-	auto indices = new gl::ElementBuffer(gl::BasicPrimitiveType::Triangles, sphereMesh.indices->size(), sphereMesh.indices->data()->data());
-	gl::VertexArray::Format format;
-	format.attrptrs.push_back(pos->AttrPtr(3, gl::DataType::Float, GL_FALSE, sizeof(pointf3)));
-	format.attrptrs.push_back(uv->AttrPtr(2, gl::DataType::Float, GL_FALSE, sizeof(pointf2)));
-	format.attrptrs.push_back(normal->AttrPtr(3, gl::DataType::Float, GL_FALSE, sizeof(normalf)));
-	format.attrptrs.push_back(tangent->AttrPtr(3, gl::DataType::Float, GL_FALSE, sizeof(vecf3)));
-	format.eb = indices;
-	sphere = new PrimitiveResource;
-	sphere->va = new gl::VertexArray{ {0,1,2,3}, format };
-	sphere->eb = indices;
-	sphere->n2vb["pos"] = pos;
-	sphere->n2vb["uv"] = uv;
-	sphere->n2vb["normal"] = normal;
-	sphere->n2vb["tangent"] = tangent;
+	sphere = new gl::Mesh(gl::BasicPrimitiveType::Triangles, sphereMesh.indices->size(), sphereMesh.positions->size(), sphereMesh.indices->data()->data(),
+		{ make_tuple(sphereMesh.positions->data()->data(), 3),
+		make_tuple(sphereMesh.texcoords->data()->data(), 2),
+		make_tuple(sphereMesh.normals->data()->data(), 3),
+		make_tuple(sphereMesh.tangents->data()->data(), 3) });
 }
 
 DeferredRenderer::Impl::~Impl() {
@@ -119,50 +81,37 @@ DeferredRenderer::Impl::~Impl() {
 	delete screenProgram;
 	delete deferredlightProgram;
 
-	for (const auto& [path, shader] : path2shader)
-		delete shader;
-	for (const auto& [primitive, rec] : p2r)
+	for (const auto& [primitive, rec] : primitive2mesh)
 		delete rec;
 
 	delete screen;
 	delete sphere;
 }
 
-gl::VertexArray* DeferredRenderer::Impl::GetPrimitiveVAO(const Primitive* primitive) {
+gl::Mesh* DeferredRenderer::Impl::GetPrimitiveMesh(const Primitive* primitive) {
 	if (vtable_is<TriMesh>(primitive)) {
-		auto target = p2r.find(primitive);
-		if (target != p2r.end())
-			return target->second->va;
+		auto target = primitive2mesh.find(primitive);
+		if (target != primitive2mesh.end())
+			return target->second;
 		auto trimesh = static_cast<const TriMesh*>(primitive);
-		auto pos = new gl::VertexBuffer(trimesh->positions->size() * sizeof(pointf3), trimesh->positions->data()->data(), gl::BufferUsage::DynamicDraw);
-		auto uv = new gl::VertexBuffer(trimesh->texcoords->size() * sizeof(pointf2), trimesh->texcoords->data()->data(), gl::BufferUsage::DynamicDraw);
-		auto normal = new gl::VertexBuffer(trimesh->normals->size() * sizeof(normalf), trimesh->normals->data()->data(), gl::BufferUsage::DynamicDraw);
-		auto tangent = new gl::VertexBuffer(trimesh->tangents->size() * sizeof(vecf3), trimesh->tangents->data()->data(), gl::BufferUsage::DynamicDraw);
-		auto indices = new gl::ElementBuffer(gl::BasicPrimitiveType::Triangles, trimesh->indices->size(), trimesh->indices->data()->data());
-		gl::VertexArray::Format format;
-		format.attrptrs.push_back(pos->AttrPtr(3, gl::DataType::Float, GL_FALSE, sizeof(pointf3)));
-		format.attrptrs.push_back(uv->AttrPtr(2, gl::DataType::Float, GL_FALSE, sizeof(pointf2)));
-		format.attrptrs.push_back(normal->AttrPtr(3, gl::DataType::Float, GL_FALSE, sizeof(normalf)));
-		format.attrptrs.push_back(tangent->AttrPtr(3, gl::DataType::Float, GL_FALSE, sizeof(vecf3)));
-		format.eb = indices;
-		auto rec = new PrimitiveResource;
-		rec->va = new gl::VertexArray{ {0,1,2,3}, format };
-		rec->eb = indices;
-		rec->n2vb["pos"] = pos;
-		rec->n2vb["uv"] = uv;
-		rec->n2vb["normal"] = normal;
-		rec->n2vb["tangent"] = tangent;
-		p2r[primitive] = rec;
-		return rec->va;
+		auto mesh = new gl::Mesh(gl::BasicPrimitiveType::Triangles, trimesh->indices->size(), trimesh->positions->size(), trimesh->indices->data()->data(),
+			{ make_tuple(trimesh->positions->data()->data(), 3),
+			make_tuple(trimesh->texcoords->data()->data(), 2),
+			make_tuple(trimesh->normals->data()->data(), 3),
+			make_tuple(trimesh->tangents->data()->data(), 3) });
+
+		primitive2mesh[primitive] = mesh;
+		return mesh;
 	}
 	else if (vtable_is<Sphere>(primitive)) {
-		return sphere->va;
-	}else
+		return sphere;
+	}
+	else
 		return nullptr;
 }
 
-gl::Texture2D* DeferredRenderer::Impl::GetTex2D(const Image* img, DefaultTex default_tex) {
-	if (img == nullptr) {
+gl::Texture2D* DeferredRenderer::Impl::GetGLTex2D(const Texture2D* tex, DefaultTex default_tex) {
+	if (tex == nullptr) {
 		switch (default_tex)
 		{
 		case Ubpa::DeferredRenderer::Impl::DefaultTex::White:
@@ -174,7 +123,7 @@ gl::Texture2D* DeferredRenderer::Impl::GetTex2D(const Image* img, DefaultTex def
 		}
 	}
 
-	auto tex2d = ResourceMngr<gl::Texture2D, const Image*>::Instance().Get(img);
+	auto tex2d = RsrcMngr<gl::Texture2D, const Texture2D*>::Instance().Get(tex);
 	if (tex2d != nullptr)
 		return tex2d;
 
@@ -191,10 +140,19 @@ gl::Texture2D* DeferredRenderer::Impl::GetTex2D(const Image* img, DefaultTex def
 		gl::PixelDataInternalFormat::Rgb,
 		gl::PixelDataInternalFormat::Rgba
 	};
-	new_tex->SetImage(0, c2if[img->channel - 1], img->width, img->height, c2f[img->channel - 1], gl::PixelDataType::Float, img->data.get());
-	new_tex->SetWrapFilter(gl::WrapMode::Repeat, gl::WrapMode::Repeat, gl::MinFilter::Linear, gl::MagFilter::Linear);
+	map<Texture2D::WrapMode, gl::WrapMode> wrapmodemap = {
+		{Texture2D::WrapMode::Clamp, gl::WrapMode::ClampToEdge},
+		{Texture2D::WrapMode::Repeat, gl::WrapMode::Repeat},
+		{Texture2D::WrapMode::Mirror, gl::WrapMode::MirroredRepeat}
+	};
+	map<Texture2D::SampleMode, gl::MagFilter> samplemodemap = {
+		{Texture2D::SampleMode::Nearest, gl::MagFilter::Nearest},
+		{Texture2D::SampleMode::Linear, gl::MagFilter::Linear}
+	};
+	new_tex->SetImage(0, c2if[tex->img->channel - 1], tex->img->width, tex->img->height, c2f[tex->img->channel - 1], gl::PixelDataType::Float, tex->img->data.get());
+	new_tex->SetWrapFilter(wrapmodemap[tex->wrap_u], wrapmodemap[tex->wrap_v], static_cast<gl::MinFilter>(samplemodemap[tex->sample_mode]), samplemodemap[tex->sample_mode]);
 
-	ResourceMngr<gl::Texture2D, const Image*>::Instance().Regist(img, new_tex);
+	RsrcMngr<gl::Texture2D, const Texture2D*>::Instance().Regist(tex, new_tex);
 
 	return new_tex;
 }
@@ -229,21 +187,20 @@ void DeferredRenderer::Impl::RenderImpl(Scene* scene, SObj* camObj, size_t width
 
 	// set pointlights
 	size_t pointLightNum = 0;
-	scene->Each([this, &pointLightNum](Cmpt::Light* light) {
+	scene->Each([this, &pointLightNum](Cmpt::Light* light, Cmpt::Position* pos) {
 		if (vtable_is<PointLight>(light->light.get())) {
 			auto pointLight = static_cast<const PointLight*>(light->light.get());
-			auto pos = light->sobj->Get<Cmpt::Transform>()->WorldPos();
 			string obj = string("pointlights[") + to_string(pointLightNum++) + "]";
-			deferredlightProgram->SetVecf3((obj + ".position").c_str(), pos);
+			deferredlightProgram->SetVecf3((obj + ".position").c_str(), pos->value);
 			deferredlightProgram->SetVecf3((obj + ".radiance").c_str(), pointLight->intensity * pointLight->color);
 		}
 	});
-	deferredlightProgram->SetUInt("pointlight_num", pointLightNum);
+	deferredlightProgram->SetUInt("pointlight_num", static_cast<GLuint>(pointLightNum));
 
 	// camera
 	auto camera = camObj->Get<Cmpt::Camera>();
 	assert(camera != nullptr);
-	auto cam_l2w = camObj->Get<Cmpt::Transform>()->LocalToWorldMatrix();
+	auto cam_l2w = camObj->Get<Cmpt::L2W>()->value;
 	auto cam_pos = cam_l2w * pointf3{ 0.f };
 	auto cam_front = cam_l2w * vecf3{ 0,0,-1 };
 	gProgram->SetMatf4("view", transformf::look_at(cam_pos, cam_pos + cam_front));
@@ -256,10 +213,10 @@ void DeferredRenderer::Impl::RenderImpl(Scene* scene, SObj* camObj, size_t width
 	gl::Clear(gl::BufferSelectBit::ColorBufferBit
 		| gl::BufferSelectBit::DepthBufferBit
 		| gl::BufferSelectBit::StencilBufferBit);
-	scene->Each([this](Cmpt::Geometry* geo, Cmpt::Material* mat) {
+	scene->Each([this](Cmpt::Geometry* geo, Cmpt::Material* mat, Cmpt::L2W* l2w) {
 		Primitive* primitive = geo->primitive;
-		auto va = GetPrimitiveVAO(primitive);
-		if (!va)
+		auto mesh = GetPrimitiveMesh(primitive);
+		if (!mesh)
 			return;
 		if (vtable_is<stdBRDF>(mat->material.get())) {
 			auto brdf = static_cast<const stdBRDF*>(mat->material.get());
@@ -267,13 +224,13 @@ void DeferredRenderer::Impl::RenderImpl(Scene* scene, SObj* camObj, size_t width
 			gProgram->SetVecf3("albedo_factor", brdf->albedo_factor);
 			gProgram->SetFloat("roughness_factor", brdf->roughness_factor);
 
-			gProgram->Active(0, GetTex2D(brdf->albedo_texture));
-			gProgram->Active(1, GetTex2D(brdf->roughness_texture));
-			gProgram->Active(2, GetTex2D(brdf->metalness_texture));
-			gProgram->Active(3, GetTex2D(brdf->normal_map, DefaultTex::Normal));
+			gProgram->Active(0, GetGLTex2D(brdf->albedo_texture));
+			gProgram->Active(1, GetGLTex2D(brdf->roughness_texture));
+			gProgram->Active(2, GetGLTex2D(brdf->metalness_texture));
+			gProgram->Active(3, GetGLTex2D(brdf->normal_map, DefaultTex::Normal));
 		}
-		gProgram->SetMatf4("model", geo->sobj->Get<Cmpt::Transform>()->LocalToWorldMatrix());
-		va->Draw(gProgram);
+		gProgram->SetMatf4("model", l2w->value);
+		mesh->Draw(*gProgram);
 	});
 
 	gl::FrameBuffer::BindReset();
@@ -287,5 +244,5 @@ void DeferredRenderer::Impl::RenderImpl(Scene* scene, SObj* camObj, size_t width
 	deferredlightProgram->SetVecf3("pointlight_pos", { 0,3,0 });
 	deferredlightProgram->SetVecf3("pointlight_radiance", { 100,100,120 });
 
-	screen->va->Draw(deferredlightProgram);
+	screen->Draw(*deferredlightProgram);
 }
