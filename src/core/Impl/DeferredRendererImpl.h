@@ -46,9 +46,11 @@ namespace Ubpa {
 		gl::Mesh* screen{ nullptr };
 		gl::Mesh* sphere{ nullptr };
 		gl::Mesh* cube{ nullptr };
+		gl::Mesh* square{ nullptr };
 
-		gl::Program* gProgram{ nullptr };
-		gl::Program* deferredlightProgram{ nullptr };
+		gl::Program* stdBRDFProgram{ nullptr };
+		gl::Program* lightProgram{ nullptr };
+		gl::Program* deferred_lightingProgram{ nullptr };
 		gl::Program* envProgram{ nullptr };
 		gl::Program* postprocessProgram{ nullptr };
 		gl::Program* screenProgram{ nullptr };
