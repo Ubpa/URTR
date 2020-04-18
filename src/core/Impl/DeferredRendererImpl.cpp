@@ -1,5 +1,7 @@
 #include "DeferredRendererImpl.h"
 
+#include "../_deps/LTCTex.h"
+
 #include <UScene/core.h>
 
 #include <UBL/RsrcMngr.h>
@@ -18,6 +20,9 @@ DeferredRenderer::Impl::Impl()
 
 	lightingBuffer_tex = new gl::Texture2D;
 	lightingBuffer_tex->SetWrapFilter(gl::WrapMode::ClampToEdge, gl::WrapMode::ClampToEdge, gl::MinFilter::Nearest, gl::MagFilter::Nearest);
+
+	LTC_tsfm.SetImage(0, gl::PixelDataInternalFormat::Rgba32F, LTC::TexSize, LTC::TexSize, gl::PixelDataFormat::Rgba, gl::PixelDataType::Float, LTC::data1);
+	LTC_nf0s.SetImage(0, gl::PixelDataInternalFormat::Rgba32F, LTC::TexSize, LTC::TexSize, gl::PixelDataFormat::Rgba, gl::PixelDataType::Float, LTC::data2);
 
 	float white_data[16] = { 1,1,1,1,1,1,1,1,1,1,1,1,1,1,1 };
 	default_white.SetImage(0, gl::PixelDataInternalFormat::Rgba, 2, 2, gl::PixelDataFormat::Rgba, gl::PixelDataType::Float, white_data);
@@ -62,6 +67,8 @@ DeferredRenderer::Impl::Impl()
 	deferredlightProgram->SetTex("gbuffer1", 1);
 	deferredlightProgram->SetTex("gbuffer2", 2);
 	deferredlightProgram->SetTex("gbuffer3", 3);
+	deferredlightProgram->SetTex("ltc_tsfm", 4);
+	deferredlightProgram->SetTex("ltc_nf0s", 5);
 
 	// vertex attributes for a quad that fills the entire screen in Normalized Device Coordinates.
 	float quad_vertices[] = { 
@@ -240,14 +247,15 @@ void DeferredRenderer::Impl::RenderImpl(Scene* scene, SObj* camObj, size_t width
 	envProgram->SetMatf4("view", transformf::look_at(cam_pos, cam_pos + cam_front));
 	envProgram->SetMatf4("projection", transformf::perspective(camera->fov, camera->ar, 0.1f, 100.f));
 
-	// set point lights and env light
+	// set point/rect lights and env light
 	size_t pointLightNum = 0;
+	size_t rectLightNum = 0;
 	const EnvLight* envLight = nullptr;
-	scene->Each([this, &envLight, &pointLightNum](Cmpt::Light* light, Cmpt::Position* pos) {
+	scene->Each([this, &envLight, &pointLightNum, &rectLightNum](Cmpt::Light* light, Cmpt::SObjPtr* sobjptr, Cmpt::L2W* l2w) {
 		if (vtable_is<PointLight>(light->light.get())) {
 			auto pointLight = static_cast<const PointLight*>(light->light.get());
 			string obj = string("pointlights[") + to_string(pointLightNum++) + "]";
-			deferredlightProgram->SetVecf3((obj + ".position").c_str(), pos->value);
+			deferredlightProgram->SetVecf3((obj + ".position").c_str(), l2w->WorldPos());
 			deferredlightProgram->SetVecf3((obj + ".radiance").c_str(), pointLight->intensity * pointLight->color);
 		}
 		else if (!envLight && vtable_is<EnvLight>(light->light.get())) {
@@ -255,10 +263,32 @@ void DeferredRenderer::Impl::RenderImpl(Scene* scene, SObj* camObj, size_t width
 			envProgram->SetVecf3("EnvLight_color", envLight->color);
 			envProgram->SetFloat("EnvLight_intensity", envLight->intensity);
 		}
+		else if (vtable_is<AreaLight>(light->light.get())) {
+			auto areaLight = static_cast<const AreaLight*>(light->light.get());
+			auto geo = sobjptr->sobj->Get<Cmpt::Geometry>();
+			if (geo) {
+				if (vtable_is<Square>(geo->primitive.get())) {
+					string obj = string("rectlights[") + to_string(rectLightNum++) + "]";
+					auto pos = l2w->WorldPos();
+					auto dir = l2w->UpInWorld().normalize();
+					auto right = l2w->RightInWorld().normalize();
+					auto scale = l2w->value->decompose_scale();
+					auto width = 2.f * scale[0];
+					auto height = 2.f * scale[2];
+					deferredlightProgram->SetVecf3((obj + ".position").c_str(), pos);
+					deferredlightProgram->SetVecf3((obj + ".dir").c_str(), dir);
+					deferredlightProgram->SetVecf3((obj + ".right").c_str(), right);
+					deferredlightProgram->SetFloat((obj + ".width").c_str(), width);
+					deferredlightProgram->SetFloat((obj + ".height").c_str(), height);
+					deferredlightProgram->SetVecf3((obj + ".radiance").c_str(), areaLight->color * areaLight->intensity);
+				}
+			}
+		}
 	});
 	if (!envLight)
 		envProgram->SetFloat("EnvLight_intensity", 0.f);
 	deferredlightProgram->SetUInt("pointlight_num", static_cast<GLuint>(pointLightNum));
+	deferredlightProgram->SetUInt("rectlight_num", static_cast<GLuint>(rectLightNum));
 
 	// [pass 1] GBuffer pass
 	gb.Bind();
@@ -295,6 +325,8 @@ void DeferredRenderer::Impl::RenderImpl(Scene* scene, SObj* camObj, size_t width
 	deferredlightProgram->Active(1, gb.GetTex2D(gl::FramebufferAttachment::ColorAttachment1));
 	deferredlightProgram->Active(2, gb.GetTex2D(gl::FramebufferAttachment::ColorAttachment2));
 	deferredlightProgram->Active(3, gb.GetTex2D(gl::FramebufferAttachment::ColorAttachment3));
+	deferredlightProgram->Active(4, &LTC_tsfm);
+	deferredlightProgram->Active(5, &LTC_nf0s);
 
 	screen->Draw(*deferredlightProgram);
 
