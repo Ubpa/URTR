@@ -22,7 +22,9 @@ DeferredRenderer::Impl::Impl()
 	lightingBuffer_tex->SetWrapFilter(gl::WrapMode::ClampToEdge, gl::WrapMode::ClampToEdge, gl::MinFilter::Nearest, gl::MagFilter::Nearest);
 
 	LTC_tsfm.SetImage(0, gl::PixelDataInternalFormat::Rgba32F, LTC::TexSize, LTC::TexSize, gl::PixelDataFormat::Rgba, gl::PixelDataType::Float, LTC::data1);
+	LTC_tsfm.SetWrapFilter(gl::WrapMode::ClampToEdge, gl::WrapMode::ClampToEdge, gl::MinFilter::Linear, gl::MagFilter::Linear);
 	LTC_nf0s.SetImage(0, gl::PixelDataInternalFormat::Rgba32F, LTC::TexSize, LTC::TexSize, gl::PixelDataFormat::Rgba, gl::PixelDataType::Float, LTC::data2);
+	LTC_nf0s.SetWrapFilter(gl::WrapMode::ClampToEdge, gl::WrapMode::ClampToEdge, gl::MinFilter::Linear, gl::MagFilter::Linear);
 
 	float white_data[16] = { 1,1,1,1,1,1,1,1,1,1,1,1,1,1,1 };
 	default_white.SetImage(0, gl::PixelDataInternalFormat::Rgba, 2, 2, gl::PixelDataFormat::Rgba, gl::PixelDataType::Float, white_data);

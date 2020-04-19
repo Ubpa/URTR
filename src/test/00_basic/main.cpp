@@ -17,10 +17,15 @@ constexpr size_t SCR_HEIGHT = 720;
 //void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 void processInput(GLFWwindow* window);
 
-struct alignas(16) Rotater : Component {
-    float d;
+struct Rotater : Component {
+    float speed{ 1.f };
+    static void OnRegist() {
+        Reflection<Rotater>::Instance()
+            .Regist(&Rotater::speed, NAMEOF(Rotater::speed).c_str());
+    }
+
     void OnUpdate(Cmpt::Rotation* rot) const {
-        rot->value = quatf{ vecf3{1.f}, to_radian(1.f) } * rot->value;
+        rot->value = quatf{ vecf3{1.f}, speed * to_radian(1.f) } * rot->value;
     }
 };
 
@@ -133,13 +138,13 @@ int main() {
     cout << rst << endl;
 
 	DeferredRenderer rtr;
-
+    scene.Start();
     while (!glfwWindowShouldClose(window)) {
         // input
         // -----
         processInput(window);
 
-        scene.Update(false);
+        scene.Update();
         rtr.Render(&scene, sobj0, SCR_WIDTH, SCR_HEIGHT);
 
         // glfw: swap buffers and poll IO events (keys pressed/released, mouse moved etc.)
@@ -147,6 +152,7 @@ int main() {
         glfwSwapBuffers(window);
         glfwPollEvents();
     }
+    scene.Stop();
 
     return 0;
 }
