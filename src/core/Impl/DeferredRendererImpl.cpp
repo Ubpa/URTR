@@ -286,7 +286,7 @@ void DeferredRenderer::Impl::RenderImpl(Scene* scene, SObj* camObj, size_t width
 		}
 		else if (vtable_is<AreaLight>(light->light.get())) {
 			auto areaLight = static_cast<const AreaLight*>(light->light.get());
-			auto geo = sobjptr->sobj->Get<Cmpt::Geometry>();
+			auto geo = sobjptr->value->Get<Cmpt::Geometry>();
 			if (geo) {
 				if (vtable_is<Square>(geo->primitive.get())) {
 					string obj = string("rectlights[") + to_string(rectLightNum++) + "]";
