@@ -2,7 +2,7 @@
 cmake_minimum_required(VERSION 3.14 FATAL_ERROR)
 
 # 设定项目
-project(URTR VERSION 0.0.8)
+project(URTR VERSION 0.0.9)
 message(STATUS "[Project] ${PROJECT_NAME}")
 
 # 在 Debug 模式下自动对 dll 和 lib 文件名后边加 d，但 exe 仍然需要手动设置
@@ -65,7 +65,7 @@ if(NOT "${Ubpa_BuildTest}" STREQUAL "OFF")
 endif()
 
 Ubpa_AddDep(UGL 0.2.3)
-Ubpa_AddDep(UScene 0.5.3)
+Ubpa_AddDep(UScene 0.5.4)
 
 Ubpa_AddSubDirsRec(src)
 
