@@ -18,13 +18,13 @@ constexpr size_t SCR_HEIGHT = 720;
 void processInput(GLFWwindow* window);
 
 namespace Ubpa::detail::dynamic_reflection {
-    void ReflRegist_Rotater();
+    void ReflRegister_Rotater();
 }
 
 struct Rotater : Component {
     float speed{ 1.f };
     static void OnRegist() {
-        detail::dynamic_reflection::ReflRegist_Rotater();
+        detail::dynamic_reflection::ReflRegister_Rotater();
     }
 
     void OnUpdate(Cmpt::Rotation* rot) const {
@@ -33,8 +33,8 @@ struct Rotater : Component {
 };
 
 int main() {
-    Scene::OnRegist();
-    CmptRegister::Instance().Regist<Rotater>();
+    Scene::OnRegister();
+    CmptRegistrar::Instance().Register<Rotater>();
 
     // glfw: initialize and configure
     // ------------------------------
@@ -177,12 +177,12 @@ void processInput(GLFWwindow* window)
 }
 
 namespace Ubpa::detail::dynamic_reflection {
-    void ReflRegist_Rotater() {
+    void ReflRegister_Rotater() {
         Reflection<Rotater>::Instance() // name : struct ::Rotater
-            .Regist(&Rotater::speed, "speed") //  float
+            .Register(&Rotater::speed, "speed") //  float
             ;
         if constexpr (std::is_base_of_v<Component, Rotater>) {
-            Reflection<Rotater>::Instance().RegistConstructor([](SObj* sobj) {
+            Reflection<Rotater>::Instance().RegisterConstructor([](SObj* sobj) {
                 if constexpr (std::is_base_of_v<Component, Rotater>) {
                     if constexpr (Ubpa::detail::SObj_::IsNecessaryCmpt<Rotater>)
                         return sobj->Get<Rotater>();
